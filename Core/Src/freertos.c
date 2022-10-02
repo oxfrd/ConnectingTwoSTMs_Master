@@ -48,6 +48,8 @@
 #define SIZE_SAMPLE_UART2 4
 
 
+#define SIZE_SAMPLE_SPI3 4
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -59,15 +61,18 @@
 /* USER CODE BEGIN Variables */
 static uint8_t Buff_TxUart1[SIZE_TXBUF_UART1];
 static uint8_t Buff_TxUart2[SIZE_TXBUF_UART2];
+static uint8_t Buff_TxSPI[SIZE_TXBUF_UART2];
 
 static uint8_t firstRunUart1 = 1;
 static uint8_t firstRunUart2 = 0;
 
 static uint8_t tempUART1[SIZE_SAMPLE_UART1];
 static uint8_t tempUART2[SIZE_SAMPLE_UART2];
+static uint8_t tempSPI3[SIZE_SAMPLE_SPI3];
 
 static RingBuffer_t Buff_RxUart1;
 static RingBuffer_t Buff_RxUart2;
+static RingBuffer_t Buff_RxSPI;
 
 
 
@@ -86,12 +91,19 @@ const osThreadAttr_t PrintToPCTask_attributes = {
   .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for ToNucleoTask */
-osThreadId_t ToNucleoTaskHandle;
-const osThreadAttr_t ToNucleoTask_attributes = {
-  .name = "ToNucleoTask",
+/* Definitions for UARTNucleoTask */
+osThreadId_t UARTNucleoTaskHandle;
+const osThreadAttr_t UARTNucleoTask_attributes = {
+  .name = "UARTNucleoTask",
   .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for SPINucleoTask */
+osThreadId_t SPINucleoTaskHandle;
+const osThreadAttr_t SPINucleoTask_attributes = {
+  .name = "SPINucleoTask",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for SemaphoreUART2 */
 osSemaphoreId_t SemaphoreUART2Handle;
@@ -111,7 +123,8 @@ const osSemaphoreAttr_t SemaphoreUART1_attributes = {
 
 void StartHearthBeatTask(void *argument);
 void StartPrintToPCTask(void *argument);
-void StartToNucleoTask(void *argument);
+void StartUARTNucleo(void *argument);
+void StartSPINucleo(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -157,8 +170,11 @@ void MX_FREERTOS_Init(void) {
   /* creation of PrintToPCTask */
   PrintToPCTaskHandle = osThreadNew(StartPrintToPCTask, NULL, &PrintToPCTask_attributes);
 
-  /* creation of ToNucleoTask */
-  ToNucleoTaskHandle = osThreadNew(StartToNucleoTask, NULL, &ToNucleoTask_attributes);
+  /* creation of UARTNucleoTask */
+  UARTNucleoTaskHandle = osThreadNew(StartUARTNucleo, NULL, &UARTNucleoTask_attributes);
+
+  /* creation of SPINucleoTask */
+  SPINucleoTaskHandle = osThreadNew(StartSPINucleo, NULL, &SPINucleoTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
@@ -222,19 +238,22 @@ void StartPrintToPCTask(void *argument)
   /* USER CODE END StartPrintToPCTask */
 }
 
-/* USER CODE BEGIN Header_StartToNucleoTask */
+/* USER CODE BEGIN Header_StartUARTNucleo */
 /**
- * @brief Function implementing the ToNucleoTask thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_StartToNucleoTask */
-void StartToNucleoTask(void *argument)
+* @brief Function implementing the UARTNucleoTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartUARTNucleo */
+void StartUARTNucleo(void *argument)
 {
-  /* USER CODE BEGIN StartToNucleoTask */
-	HAL_UART_Receive_DMA(&huart4, tempUART1, SIZE_SAMPLE_UART1);
-	xSemaphoreTake(SemaphoreUART1Handle, portMAX_DELAY);
+  /* USER CODE BEGIN StartUARTNucleo */
+	HAL_UART_Receive_DMA(&huart4,
+				tempUART1, SIZE_SAMPLE_UART1);
 	uint8_t errorerUart1;
+	printf("Hello PC, it's nucleo UART task!!\n\r");
+	xSemaphoreTake(SemaphoreUART1Handle, portMAX_DELAY);
+
 	/* Infinite loop */
 	for(;;)
 	{
@@ -242,12 +261,43 @@ void StartToNucleoTask(void *argument)
 		errorerUart1 = RingBuffReadSome(&Buff_RxUart1, Buff_TxUart1, SIZE_TXBUF_UART1);
 		if(errorerUart1 != 0)
 			HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
-		printf("NUCLEO: %c%c%c%c\n\r", Buff_TxUart1[0],
+		printf("UART: %c%c%c%c\n\r", Buff_TxUart1[0],
 				Buff_TxUart1[1],
 				Buff_TxUart1[2],
 				Buff_TxUart1[3]);
 	}
-  /* USER CODE END StartToNucleoTask */
+  /* USER CODE END StartUARTNucleo */
+}
+
+/* USER CODE BEGIN Header_StartSPINucleo */
+/**
+* @brief Function implementing the SPINucleoTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartSPINucleo */
+void StartSPINucleo(void *argument)
+{
+  /* USER CODE BEGIN StartSPINucleo */
+	HAL_UART_Receive_DMA(&huart4,
+					tempUART1, SIZE_SAMPLE_UART1);
+	uint8_t errorerUart1;
+	printf("Hello PC, it's nucleo UART task!!\n\r");
+	xSemaphoreTake(SemaphoreUART1Handle, portMAX_DELAY);
+
+	/* Infinite loop */
+	for(;;)
+	{
+		xSemaphoreTake(SemaphoreUART1Handle, portMAX_DELAY);
+		errorerUart1 = RingBuffReadSome(&Buff_RxUart1, Buff_TxUart1, SIZE_TXBUF_UART1);
+		if(errorerUart1 != 0)
+			HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
+		printf("SPI: %c%c%c%c\n\r", Buff_TxUart1[0],
+				Buff_TxUart1[1],
+				Buff_TxUart1[2],
+				Buff_TxUart1[3]);
+	}
+  /* USER CODE END StartSPINucleo */
 }
 
 /* Private application code --------------------------------------------------*/
